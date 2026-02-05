@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SLTMobitel SME Portal – Project Monitoring System</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind Config for SLT Branding -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        sltBlue: '#005eb8',
+                        sltGreen: '#008000',
+                        sltOrange: '#f97316',
+                        sltPurple: '#8b5cf6',
+                        sltDark: '#0f172a',
+                        sltLight: '#f8fafc',
+                        surface: '#ffffff',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+                        'glow': '0 0 15px rgba(0, 94, 184, 0.2)',
+                        'sidebar': '4px 0 24px -4px rgba(0, 0, 0, 0.08)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Animations */
+        .animate-enter { animation: slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; transform: translateY(20px); }
+        .animate-stagger-1 { animation-delay: 0.1s; }
+        .animate-stagger-2 { animation-delay: 0.2s; }
+        .animate-stagger-3 { animation-delay: 0.3s; }
+        
+        @keyframes slideUpFade {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Circular Progress Bar Styles */
+        .progress-ring__circle {
+            transition: stroke-dashoffset 1s ease-in-out;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        @keyframes fillProgress {
+            from { stroke-dashoffset: 100; }
+            to { stroke-dashoffset: var(--target-offset); }
+        }
+
+        /* Input Styling */
+        .modern-input {
+            transition: all 0.2s ease;
+            background-color: #f1f5f9;
+            border: 1px solid transparent;
+        }
+        .modern-input:focus {
+            background-color: #ffffff;
+            border-color: #005eb8;
+            box-shadow: 0 0 0 3px rgba(0, 94, 184, 0.1);
+            outline: none;
+        }
+
+        /* Login Background */
+        .login-gradient {
+            background: linear-gradient(135deg, #dbeafe 0%, #ffffff 50%, #dcfce7 100%);
+            background-size: 200% 200%;
+            animation: gradientMove 10s ease infinite;
+        }
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Glass Effect */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Sidebar Text Transition */
+        .sidebar-text {
+            white-space: nowrap;
+            opacity: 1;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        .sidebar-collapsed .sidebar-text {
+            opacity: 0;
+            width: 0;
+            display: none;
+        }
+        
+        /* Active Marker for Sidebar */
+        .nav-item {
+            position: relative;
+        }
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            height: 0%;
+            width: 3px;
+            background-color: #005eb8;
+            transition: all 0.3s ease;
+            border-radius: 0 4px 4px 0;
+        }
+        .nav-item.active::before {
+            height: 70%;
+        }
+        .nav-item:hover::before {
+            height: 40%;
+        }
+        .sidebar-collapsed .nav-item::before {
+            left: 50%;
+            top: 0;
+            transform: translateX(-50%);
+            width: 40%;
+            height: 3px;
+            border-radius: 0 0 4px 4px;
+        }
+        .sidebar-collapsed .nav-item.active::before {
+            top: 0;
+            width: 60%;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300 overflow-hidden">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-[100] flex flex-col gap-2"></div>
+
+    <!-- Modal Container -->
+    <div id="modal-overlay" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/30 backdrop-blur-sm transition-opacity">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl p-8 m-4 border border-slate-100 dark:border-slate-700 relative transform transition-all scale-95 opacity-0" id="modal-content">
+            <!-- Content injected via JS -->
+        </div>
+    </div>
+
+    <!-- Main App Root -->
+    <div id="root" class="h-full w-full"></div>
+
+    <script>
+        // --- ICONS (SVG Strings) ---
+        const Icons = {
+            Logo: `<img src="https://z-cdn-media.chatglm.cn/files/45055c42-72ab-412b-9b25-ea6c941ca7c4.jpg?auth_key=1870194378-d8eb6824cb344335b441090d1489af73-0-eecb1691025fd89d3ff7277a978fd021" alt="SLTMobitel" class="h-9 object-contain transition-transform hover:scale-105">`,
+            Dashboard: `<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>`,
+            Projects: `<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2v2" /></svg>`,
+            DailyWork: `<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>`, 
+            Teams: `<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>`,
+            LogOut: `<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>`,
+            Menu: `<svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>`,
+            Plus: `<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>`,
+            Trash: `<svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>`,
+            Edit: `<svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>`,
+            Save: `<svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>`,
+            Moon: `<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>`,
+            Sun: `<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>`,
+            IconTotal: `<svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>`,
+            IconActive: `<svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>`,
+            IconDelayed: `<svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
+            IconCompleted: `<svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
+            User: `<svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h4a7 7 0 00-7-7h-1.707l2.147-2.147a2 2 0 012.828 0l1.414 1.414a2 2 0 010 2.828l-4.414-4.414a2 2 0 010-2.828L6.293 6.707a2 2 0 010-2.828l-2.147-2.147A2 2 0 015 12V8a2 2 0 012-2h-1z" /></svg>`,
+            Lock: `<svg class="w-16 h-16 text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>`
+        };
+
+        // --- UTILS ---
+        const getLocalDateString = () => {
+            return new Date().toLocaleDateString('en-CA');
+        };
+
+        const Toast = {
+            show(message, type = 'neutral') {
+                const container = document.getElementById('toast-container');
+                const el = document.createElement('div');
+                const colors = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-slate-800 dark:bg-slate-600';
+                el.className = `${colors} text-white px-6 py-3 rounded-xl shadow-lg transform translate-x-10 opacity-0 transition-all duration-300 flex items-center text-sm font-medium`;
+                el.innerText = message;
+                container.appendChild(el);
+                
+                requestAnimationFrame(() => {
+                    el.classList.remove('translate-x-10', 'opacity-0');
+                });
+
+                setTimeout(() => {
+                    el.classList.add('translate-x-10', 'opacity-0');
+                    setTimeout(() => el.remove(), 300);
+                }, 3000);
+            }
+        };
+
+        const Modal = {
+            open(title, htmlContent) {
+                const overlay = document.getElementById('modal-overlay');
+                const content = document.getElementById('modal-content');
+                
+                content.innerHTML = `
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold text-slate-800 dark:text-white">${title}</h3>
+                        <button onclick="Modal.close()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                    <div class="animate-enter">
+                        ${htmlContent}
+                    </div>
+                `;
+
+                overlay.classList.remove('hidden');
+                overlay.classList.add('flex');
+                requestAnimationFrame(() => {
+                    content.classList.remove('scale-95', 'opacity-0');
+                    content.classList.add('scale-100', 'opacity-100');
+                });
+            },
+            close() {
+                const overlay = document.getElementById('modal-overlay');
+                const content = document.getElementById('modal-content');
+                
+                content.classList.remove('scale-100', 'opacity-100');
+                content.classList.add('scale-95', 'opacity-0');
+                
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                    overlay.classList.remove('flex');
+                }, 200);
+            }
+        };
+
+        // --- STATE MANAGEMENT ---
+        const Store = {
+            user: null,
+            darkMode: false,
+            currentView: 'dashboard',
+            sidebarOpen: false,
+            sidebarCollapsed: false,
+            projectFilter: 'all',
+            accountModalTab: 'profile',
+            data: {
+                projects: [
+                    { id: 1, name: 'Network Expansion Phase 1', start: '2023-10-01', end: '2023-12-31', teamName: 'Alpha Squad', status: 'Active', progress: 65, members: ['Alice Johnson', 'Bob Smith', 'Charlie Brown'] },
+                    { id: 2, name: 'Fiber Optic Upgrade', start: '2023-09-15', end: '2023-11-20', teamName: 'Beta Team', status: 'Delayed', progress: 40, members: ['Dave Williams', 'Eve Davis'] },
+                    { id: 3, name: 'SME Portal Dev', start: '2023-10-10', end: '2024-01-10', teamName: 'Tech Ninjas', status: 'Active', progress: 20, members: ['Rachel Zane', 'Harvey Specter'] },
+                    { id: 4, name: 'Core System Migration', start: '2023-08-01', end: '2023-09-01', teamName: 'Tech Ninjas', status: 'Completed', progress: 100, members: ['Rachel Zane', 'Harvey Specter'] },
+                ],
+                teams: [
+                    { id: 1, name: 'Alpha Squad', leader: 'John Doe', members: ['Alice Johnson', 'Bob Smith', 'Charlie Brown'] },
+                    { id: 2, name: 'Beta Team', leader: 'Jane Smith', members: ['Dave Williams', 'Eve Davis'] },
+                    { id: 3, name: 'Tech Ninjas', leader: 'Mike Ross', members: ['Rachel Zane', 'Harvey Specter', 'Louis Litt'] },
+                ],
+                logs: [
+                    { id: 1, date: getLocalDateString(), projectName: 'Network Expansion Phase 1', teamName: 'Alpha Squad', description: "Completed initial routing configuration for northern sector.", members: 'Alice, Bob', duration: 8 },
+                    { id: 2, date: getLocalDateString(), projectName: 'Fiber Optic Upgrade', teamName: 'Beta Team', description: "Installed fiber optic cables in sector 4B.", members: 'Dave', duration: 5 },
+                    { id: 3, date: '2023-10-20', projectName: 'SME Portal Dev', teamName: 'Tech Ninjas', description: "Backend API integration testing.", members: 'Rachel', duration: 4 },
+                ]
+            },
+
+            getRemainingDays(end) {
+                const diff = new Date(end) - new Date();
+                return Math.ceil(diff / (1000 * 60 * 60 * 24));
+            },
+
+            updateProjectProgress() {
+                this.data.projects.forEach(p => {
+                    const projectLogs = this.data.logs.filter(l => l.projectName === p.name);
+                    let newProgress = 20 + (projectLogs.length * 5);
+                    if (newProgress > 100) newProgress = 100;
+                    p.progress = newProgress;
+                });
+                Render.app();
+            },
+
+            login(username, password) {
+                if (username === 'Sme' && password === '12911!@') {
+                    // SAVED USERNAME HERE
+                    this.user = { role: 'admin', name: 'SME Admin', email: 'admin@sltmobitel.com', username: username };
+                    Render.app();
+                    return true;
+                } 
+                return false;
+            },
+
+            logout() {
+                this.user = null;
+                Render.app();
+            },
+
+            toggleTheme() {
+                this.darkMode = !this.darkMode;
+                document.documentElement.classList.toggle('dark');
+                Render.app();
+            },
+
+            toggleSidebarCollapse() {
+                this.sidebarCollapsed = !this.sidebarCollapsed;
+                Render.app();
+            },
+
+            setProjectFilter(filterType) {
+                this.currentView = 'projects';
+                this.projectFilter = filterType; 
+                Render.app();
+            },
+
+            addProject(project) {
+                this.data.projects.push({ ...project, id: Date.now(), progress: 0 });
+                Render.app();
+                Toast.show('Project added successfully', 'success');
+            },
+
+            updateProject(id, updatedFields) {
+                const idx = this.data.projects.findIndex(p => p.id === id);
+                if (idx !== -1) {
+                    this.data.projects[idx] = { ...this.data.projects[idx], ...updatedFields };
+                    Render.app();
+                    Toast.show('Project updated', 'success');
+                }
+            },
+
+            deleteProject(id) {
+                this.data.projects = this.data.projects.filter(p => p.id !== id);
+                Render.app();
+                Toast.show('Project removed', 'neutral');
+            },
+
+            addLog(log) {
+                this.data.logs.push({ ...log, id: Date.now() });
+                this.updateProjectProgress();
+                Toast.show("Today's work logged successfully", 'success');
+            },
+
+            deleteLog(id) {
+                this.data.logs = this.data.logs.filter(l => l.id !== id);
+                this.updateProjectProgress();
+                Toast.show('Log removed', 'neutral');
+            },
+            
+            addTeam(team) {
+                const membersArray = (typeof team.members === 'string') 
+                    ? team.members.split(',').map(s => s.trim()) 
+                    : team.members;
+
+                this.data.teams.push({ ...team, id: Date.now(), members: membersArray });
+                Render.app();
+                Toast.show('Team created', 'success');
+            },
+
+            deleteTeam(id) {
+                this.data.teams = this.data.teams.filter(t => t.id !== id);
+                Render.app();
+                Toast.show('Team removed', 'neutral');
+            },
+
+            updateProfile(name) {
+                this.user.name = name;
+                Render.app();
+                Toast.show('Profile updated successfully', 'success');
+            }
+        };
+
+        // --- RENDERER ---
+        const Render = {
+            app() {
+                const root = document.getElementById('root');
+                if (!Store.user) {
+                    root.innerHTML = this.loginScreen();
+                    this.attachLoginEvents();
+                } else {
+                    root.innerHTML = this.dashboardLayout();
+                    this.attachGlobalEvents();
+                    this.initChart();
+                }
+            },
+
+            loginScreen() {
+                return `
+                <div class="min-h-screen flex items-center justify-center login-gradient p-4">
+                    <div class="glass-card p-10 rounded-3xl w-full max-w-md animate-enter">
+                        <div class="flex flex-col items-center mb-8">
+                            <div class="p-3 bg-white rounded-2xl shadow-sm mb-4">${Icons.Logo}</div>
+                            <h2 class="text-2xl font-bold text-slate-800 tracking-tight">SLTMobitel SME Portal</h2>
+                            <p class="text-slate-500 text-sm mt-1">Enterprise Project Monitoring</p>
+                        </div>
+                        
+                        <div class="flex bg-slate-200/50 p-1 rounded-xl mb-8 backdrop-blur-md" id="login-type-toggle">
+                            <button type="button" data-mode="admin" class="login-tab flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 bg-white text-sltBlue shadow-sm">Admin Account</button>
+                            <button type="button" data-mode="user" class="login-tab flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 text-slate-500 hover:text-slate-700">User Account</button>
+                        </div>
+
+                        <form id="login-form" class="space-y-5">
+                            <div id="login-fields-container" class="space-y-5 transition-opacity duration-300">
+                                <div class="space-y-2">
+                                    <label id="username-label" class="text-sm font-medium text-slate-600 ml-1">Username</label>
+                                    <input type="text" id="username" class="modern-input w-full px-4 py-3 rounded-xl text-slate-800 placeholder-slate-400" placeholder="Admin Username">
+                                </div>
+                                <div class="space-y-2" id="password-field">
+                                    <label class="text-sm font-medium text-slate-600 ml-1">Password</label>
+                                    <input type="password" id="password" class="modern-input w-full px-4 py-3 rounded-xl text-slate-800 placeholder-slate-400" placeholder="••••">
+                                </div>
+                            </div>
+                            
+                            <button type="submit" id="submit-btn" class="w-full py-3.5 text-white rounded-xl font-bold transition-all duration-300 transform hover:scale-[1.02] active:scale-95 shadow-lg bg-sltBlue hover:shadow-blue-200">Login as Admin</button>
+                        </form>
+                    </div>
+                </div>`;
+            },
+
+            dashboardLayout() {
+                const activeTab = Store.currentView;
+                const content = this.getViewContent(activeTab);
+                const isCollapsed = Store.sidebarCollapsed;
+
+                return `
+                <div class="min-h-screen flex flex-col md:flex-row bg-slate-50/50">
+                    <!-- SIDEBAR -->
+                    <div class="${isCollapsed ? 'sidebar-collapsed' : ''} group fixed inset-y-0 left-0 z-30 bg-white border-r border-slate-100 shadow-sidebar transition-all duration-300 ease-in-out 
+                        ${Store.sidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
+                        md:translate-x-0 md:static md:flex flex-col
+                        ${isCollapsed ? 'md:w-20' : 'md:w-72'}">
+                        
+                        <div class="h-20 flex items-center justify-between px-4 md:px-6 border-b border-slate-100 transition-all duration-300">
+                            <div class="flex items-center overflow-hidden whitespace-nowrap">
+                                <div class="shrink-0">${Icons.Logo}</div>
+                            </div>
+                            <button id="collapse-btn" onclick="Store.toggleSidebarCollapse()" class="hidden md:flex w-8 h-8 items-center justify-center text-slate-400 hover:text-sltBlue hover:bg-blue-50 rounded-lg transition-all duration-300" title="${isCollapsed ? 'Maximize Sidebar' : 'Minimize Sidebar'}">
+                                ${isCollapsed 
+                                    ? `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>` 
+                                    : `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>`
+                                }
+                            </button>
+                        </div>
+                        
+                        <nav class="flex-1 p-4 space-y-2 overflow-y-auto overflow-x-hidden">
+                            ${this.renderNavItem('dashboard', 'Dashboard', Icons.Dashboard)}
+                            ${this.renderNavItem('projects', 'Projects', Icons.Projects)}
+                            ${this.renderNavItem('dailywork', 'Daily Work', Icons.DailyWork)}
+                            ${this.renderNavItem('teams', 'Teams', Icons.Teams)}
+                        </nav>
+
+                        <div class="p-4 border-t border-slate-100">
+                            <button id="logout-btn" class="flex w-full items-center ${isCollapsed ? 'justify-center' : 'justify-start'} space-x-3 px-3 py-2.5 text-red-500 hover:bg-red-50 rounded-xl transition font-medium group/btn" title="Logout">
+                                <div class="shrink-0">${Icons.LogOut}</div>
+                                <span class="sidebar-text font-medium">Logout</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- MAIN CONTENT -->
+                    <div class="flex-1 flex flex-col h-screen overflow-hidden">
+                        <header class="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200/60 flex items-center justify-between px-8 z-20 sticky top-0">
+                            <div class="flex items-center">
+                                <button id="menu-btn" class="md:hidden mr-4 p-2 text-slate-500 rounded-lg hover:bg-slate-100 transition">${Icons.Menu}</button>
+                                <div>
+                                    <h1 class="text-xl font-bold text-slate-800 capitalize tracking-tight">${activeTab}</h1>
+                                    <span class="text-xs text-slate-400 font-medium uppercase tracking-wider">${Store.user.role === 'admin' ? 'Admin Mode' : 'View Mode'}</span>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center space-x-4">
+                                <button id="theme-btn" class="p-2.5 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors bg-slate-50 border border-slate-200">
+                                    ${Store.darkMode ? Icons.Sun : Icons.Moon}
+                                </button>
+                                <div class="h-8 w-px bg-slate-200 mx-2"></div>
+                                <button id="my-account-btn" class="flex items-center space-x-3 bg-slate-50 hover:bg-slate-100 rounded-lg px-3 py-1.5 transition cursor-pointer border border-transparent hover:border-slate-200">
+                                    <div class="w-9 h-9 rounded-xl bg-sltBlue text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-200">${Store.user.role === 'admin' ? 'A' : 'U'}</div>
+                                    <span class="text-sm font-medium text-slate-700 hidden md:block">My Account</span>
+                                </button>
+                            </div>
+                        </header>
+
+                        <main class="flex-1 overflow-y-auto p-6 md:p-8 scroll-smooth">
+                            <div class="max-w-7xl mx-auto animate-enter">
+                                ${content}
+                            </div>
+                        </main>
+                    </div>
+                </div>`;
+            },
+
+            renderNavItem(id, label, icon) {
+                const active = Store.currentView === id;
+                const isCollapsed = Store.sidebarCollapsed;
+                
+                let baseClass = "w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer group select-none relative";
+                let activeClass = active ? "bg-blue-50 text-sltBlue" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800";
+                let justifyClass = isCollapsed ? "justify-center" : "justify-start";
+                const textSpan = `<span class="sidebar-text ml-3 font-medium">${label}</span>`;
+
+                return `<div onclick="Store.currentView = '${id}'; Store.sidebarOpen = false; Render.app();" class="${baseClass} ${activeClass} ${justifyClass}" title="${isCollapsed ? label : ''}">
+                            <div class="shrink-0">${icon}</div>
+                            ${textSpan}
+                        </div>`;
+            },
+
+            circleProgress(percent) {
+                const size = 48;
+                const strokeWidth = 4;
+                const radius = (size - strokeWidth) / 2;
+                const circumference = 2 * Math.PI * radius;
+                const offset = circumference - (percent / 100) * circumference;
+
+                return `
+                <div class="relative w-[48px] h-[48px] flex items-center justify-center">
+                    <svg class="w-full h-full" style="transform: rotate(-90deg);">
+                        <circle cx="50%" cy="50%" r="${radius}" stroke="#e2e8f0" stroke-width="${strokeWidth}" fill="transparent" />
+                        <circle cx="50%" cy="50%" r="${radius}" 
+                                stroke="#8F00FF" 
+                                stroke-width="${strokeWidth}" 
+                                fill="transparent" 
+                                stroke-dasharray="${circumference}" 
+                                stroke-dashoffset="${offset}" 
+                                stroke-linecap="round"
+                                class="progress-ring__circle"
+                                style="animation: fillProgress 1s ease-out forwards; --target-offset: ${offset};"
+                        />
+                    </svg>
+                    <span class="absolute text-[10px] font-bold text-slate-600">${Math.round(percent)}%</span>
+                </div>`;
+            },
+
+            getViewContent(view) {
+                switch(view) {
+                    case 'dashboard': return this.viewDashboard();
+                    case 'projects': return this.viewProjects();
+                    case 'dailywork': return this.viewDailyWork();
+                    case 'teams': return this.viewTeams();
+                    default: return this.viewDashboard();
+                }
+            },
+
+            // --- VIEW CONTENT ---
+
+            viewDashboard() {
+                const { projects } = Store.data;
+                const total = projects.length;
+                const active = projects.filter(p => p.status === 'Active').length;
+                const delayed = projects.filter(p => p.status === 'Delayed').length;
+                const completed = projects.filter(p => p.status === 'Completed').length;
+
+                return `
+                <div class="space-y-8">
+                    <div>
+                        <h2 class="text-3xl font-bold text-slate-800 tracking-tight">Dashboard Overview</h2>
+                        <p class="text-slate-500 mt-2">Welcome back! Here's what's happening today.</p>
+                    </div>
+                    
+                    <!-- Summary Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div onclick="Store.setProjectFilter('all')" class="dashboard-stat-card cursor-pointer bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden group animate-enter">
+                            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <svg class="w-24 h-24 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                            </div>
+                            <div class="relative z-10 flex flex-col h-full justify-between">
+                                <div class="card-icon-container bg-white/20 w-12 h-12 rounded-xl flex items-center justify-center backdrop-blur-sm transition-transform duration-300">
+                                    ${Icons.IconTotal}
+                                </div>
+                                <div>
+                                    <h3 class="text-4xl font-bold mb-1">${total}</h3>
+                                    <p class="text-violet-100 font-medium text-sm">Total Projects</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div onclick="Store.setProjectFilter('Active')" class="dashboard-stat-card cursor-pointer bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden group animate-enter animate-stagger-1">
+                            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <svg class="w-24 h-24 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            </div>
+                            <div class="relative z-10 flex flex-col h-full justify-between">
+                                <div class="card-icon-container bg-white/20 w-12 h-12 rounded-xl flex items-center justify-center backdrop-blur-sm transition-transform duration-300">
+                                    ${Icons.IconActive}
+                                </div>
+                                <div>
+                                    <h3 class="text-4xl font-bold mb-1">${active}</h3>
+                                    <p class="text-blue-100 font-medium text-sm">Active Projects</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div onclick="Store.setProjectFilter('Delayed')" class="dashboard-stat-card cursor-pointer bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden group animate-enter animate-stagger-2">
+                            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <svg class="w-24 h-24 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </div>
+                            <div class="relative z-10 flex flex-col h-full justify-between">
+                                <div class="card-icon-container bg-white/20 w-12 h-12 rounded-xl flex items-center justify-center backdrop-blur-sm transition-transform duration-300">
+                                    ${Icons.IconDelayed}
+                                </div>
+                                <div>
+                                    <h3 class="text-4xl font-bold mb-1">${delayed}</h3>
+                                    <p class="text-orange-100 font-medium text-sm">Delayed Projects</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div onclick="Store.setProjectFilter('Completed')" class="dashboard-stat-card cursor-pointer bg-gradient-to-br from-green-600 to-green-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden group animate-enter animate-stagger-3" style="background: linear-gradient(to bottom right, #008000, #006400);">
+                            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <svg class="w-24 h-24 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </div>
+                            <div class="relative z-10 flex flex-col h-full justify-between">
+                                <div class="card-icon-container bg-white/20 w-12 h-12 rounded-xl flex items-center justify-center backdrop-blur-sm transition-transform duration-300">
+                                    ${Icons.IconCompleted}
+                                </div>
+                                <div>
+                                    <h3 class="text-4xl font-bold mb-1">${completed}</h3>
+                                    <p class="text-green-100 font-medium text-sm">Completed Projects</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 1. Project Status Chart -->
+                    <div class="bg-white p-8 rounded-2xl shadow-soft border border-slate-100 animate-enter animate-stagger-1">
+                        <h3 class="text-lg font-bold text-slate-800 mb-6">Project Status Overview</h3>
+                        <div class="flex flex-col md:flex-row items-center gap-8">
+                            <div class="relative w-full max-w-xs aspect-square md:aspect-auto md:h-64">
+                                <canvas id="dashboardChart"></canvas>
+                                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div class="text-center">
+                                        <span class="text-3xl font-bold text-slate-800">${total}</span>
+                                        <p class="text-xs text-slate-400 uppercase tracking-wide">Total</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex-1 space-y-4 w-full">
+                                <div class="flex items-center justify-between p-4 bg-blue-50 rounded-xl">
+                                    <div class="flex items-center">
+                                        <div class="w-3 h-3 rounded-full mr-3" style="background-color: #005eb8;"></div>
+                                        <span class="font-medium text-slate-700">Active Projects</span>
+                                    </div>
+                                    <span class="font-bold text-slate-800">${active}</span>
+                                </div>
+                                <div class="flex items-center justify-between p-4 bg-green-50 rounded-xl">
+                                    <div class="flex items-center">
+                                        <div class="w-3 h-3 rounded-full mr-3" style="background-color: #008000;"></div>
+                                        <span class="font-medium text-slate-700">Completed Projects</span>
+                                    </div>
+                                    <span class="font-bold text-slate-800">${completed}</span>
+                                </div>
+                                <div class="flex items-center justify-between p-4 bg-orange-50 rounded-xl">
+                                    <div class="flex items-center">
+                                        <div class="w-3 h-3 rounded-full mr-3" style="background-color: #f97316;"></div>
+                                        <span class="font-medium text-slate-700">Delayed Projects</span>
+                                    </div>
+                                    <span class="font-bold text-slate-800">${delayed}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Recent Projects Table -->
+                    <div class="bg-white p-6 rounded-2xl shadow-soft border border-slate-100 overflow-hidden animate-enter animate-stagger-2">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-lg font-bold text-slate-800">Recent Projects</h3>
+                            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Live Updates</span>
+                        </div>
+                        <div class="overflow-x-auto rounded-xl border border-slate-100">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-slate-50/50 text-xs font-semibold text-slate-500 uppercase">
+                                    <tr>
+                                        <th class="px-6 py-4">Project</th>
+                                        <th class="px-6 py-4">Start</th>
+                                        <th class="px-6 py-4">End</th>
+                                        <th class="px-6 py-4">Remaining</th>
+                                        <th class="px-6 py-4">Team</th>
+                                        <th class="px-6 py-4">Status</th>
+                                        <th class="px-6 py-4">Progress</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    ${projects.slice(0, 5).map(p => {
+                                        const days = Store.getRemainingDays(p.end);
+                                        const overdue = days < 0;
+                                        let statusColorClass = p.status === 'Active' ? 'bg-blue-50 text-blue-700' : 
+                                                              p.status === 'Delayed' ? 'bg-orange-50 text-orange-700' : 'bg-green-50 text-green-700';
+                                        return `
+                                        <tr class="hover:bg-slate-50/50 transition-colors">
+                                            <td class="px-6 py-4 font-medium text-slate-800">${p.name}</td>
+                                            <td class="px-6 py-4 text-slate-500">${p.start}</td>
+                                            <td class="px-6 py-4 text-slate-500">${p.end}</td>
+                                            <td class="px-6 py-4 font-semibold text-sm">
+                                                <span class="${overdue ? 'text-red-500 bg-red-50' : 'text-slate-600 bg-slate-100'} px-2 py-1 rounded-md">
+                                                    ${overdue ? 'Overdue' : `${days} days`}
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4"><button class="text-sltBlue hover:text-blue-700 font-medium text-xs uppercase tracking-wide hover:underline" onclick="Render.viewTeamModal('${p.teamName}')">${p.teamName}</button></td>
+                                            <td class="px-6 py-4">
+                                                <span class="px-3 py-1 rounded-full text-xs font-semibold ${statusColorClass}">${p.status}</span>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                ${this.circleProgress(p.progress)}
+                                            </td>
+                                        </tr>`;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>`;
+            },
+
+            viewProjects() {
+                const isAdmin = Store.user.role === 'admin';
+                const { projects } = Store.data;
+                let displayProjects = projects;
+                let filterBadge = null;
+
+                if (Store.projectFilter && Store.projectFilter !== 'all') {
+                    displayProjects = projects.filter(p => p.status === Store.projectFilter);
+                    const colors = Store.projectFilter === 'Active' ? 'text-blue-600 bg-blue-50' : 
+                                  Store.projectFilter === 'Delayed' ? 'text-orange-600 bg-orange-50' : 'text-green-600 bg-green-50';
+                    filterBadge = `<span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${colors}">${Store.projectFilter}</span>`;
+                }
+
+                return `
+                <div class="space-y-8">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div class="flex items-center gap-3">
+                            <div>
+                                <h2 class="text-3xl font-bold text-slate-800 tracking-tight">Projects</h2>
+                                <p class="text-slate-500 mt-1">Manage and monitor ongoing initiatives.</p>
+                            </div>
+                            ${filterBadge}
+                        </div>
+
+                        <div class="flex gap-3">
+                            ${Store.projectFilter !== 'all' ? `<button onclick="Store.setProjectFilter('all')" class="text-sm px-4 py-2.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium transition">Clear Filter</button>` : ''}
+                            ${isAdmin ? `<button onclick="Render.openProjectModal()" class="bg-sltBlue text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-blue-200 transition-all duration-300 flex items-center space-x-2 transform hover:-translate-y-0.5">${Icons.Plus}<span>Add Project</span></button>` : ''}
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden">
+                        ${displayProjects.length === 0 ? `
+                            <div class="p-12 text-center">
+                                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-50 mb-4">
+                                    <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                                </div>
+                                <h3 class="text-lg font-medium text-slate-900">No projects found</h3>
+                                <p class="text-slate-500 mt-1">Try clearing your filter or add a new project.</p>
+                            </div>
+                        ` : `
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-slate-50/50 text-xs font-semibold text-slate-500 uppercase border-b border-slate-100">
+                                    <tr>
+                                        <th class="px-6 py-4">Project Name</th>
+                                        <th class="px-6 py-4">Start Day</th>
+                                        <th class="px-6 py-4">End Day</th>
+                                        <th class="px-6 py-4">Remaining Days</th>
+                                        <th class="px-6 py-4">Team Name</th>
+                                        <th class="px-6 py-4">Status</th>
+                                        <th class="px-6 py-4">Progress</th>
+                                        ${isAdmin ? '<th class="px-6 py-4 text-center">Actions</th>' : ''}
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-50">
+                                    ${displayProjects.map(p => {
+                                        const days = Store.getRemainingDays(p.end);
+                                        const overdue = days < 0;
+                                        let statusColorClass = '';
+                                        if(p.status === 'Active') statusColorClass = 'bg-blue-50 text-blue-700';
+                                        else if(p.status === 'Delayed') statusColorClass = 'bg-orange-50 text-orange-700';
+                                        else statusColorClass = 'bg-green-50 text-green-700';
+
+                                        return `
+                                        <tr class="hover:bg-slate-50/30 transition-colors group">
+                                            <td class="px-6 py-4 font-medium text-slate-800 group-hover:text-sltBlue">${p.name}</td>
+                                            <td class="px-6 py-4 text-slate-500">${p.start}</td>
+                                            <td class="px-6 py-4 text-slate-500">${p.end}</td>
+                                            <td class="px-6 py-4"><span class="${overdue ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'} text-xs font-semibold px-2 py-1 rounded-md">${overdue ? 'Overdue' : `${days} days`}</span></td>
+                                            <td class="px-6 py-4"><button class="text-sltBlue hover:underline text-xs font-bold uppercase" onclick="Render.viewTeamModal('${p.teamName}')">${p.teamName}</button></td>
+                                            <td class="px-6 py-4"><span class="px-3 py-1 rounded-full text-xs font-semibold ${statusColorClass}">${p.status}</span></td>
+                                            <td class="px-6 py-4">
+                                                ${this.circleProgress(p.progress)}
+                                            </td>
+                                            ${isAdmin ? `
+                                            <td class="px-6 py-4">
+                                                <div class="flex items-center justify-center space-x-2 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button onclick="Render.openProjectModal(${p.id})" class="p-2 text-blue-500 bg-blue-50 rounded-lg hover:bg-blue-100 transition">${Icons.Edit}</button>
+                                                    <button onclick="Store.deleteProject(${p.id})" class="p-2 text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">${Icons.Trash}</button>
+                                                </div>
+                                            </td>` : ''}
+                                        </tr>`;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        `}
+                    </div>
+                </div>`;
+            },
+
+            viewDailyWork() {
+                const isAdmin = Store.user.role === 'admin';
+                const { logs, projects } = Store.data;
+                const today = getLocalDateString();
+                const sortedLogs = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                return `
+                <div class="space-y-8">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Daily Work – Add Today’s Work</h2>
+                            <p class="text-slate-500 mt-1">Track daily progress and team activities.</p>
+                        </div>
+                        ${isAdmin ? `<button onclick="Render.openLogModal()" class="bg-sltBlue text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-blue-200 transition-all duration-300 flex items-center space-x-2 transform hover:-translate-y-0.5">${Icons.Plus}<span>Add Today's Work</span></button>` : ''}
+                    </div>
+
+                    <div class="bg-slate-50 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 animate-enter animate-stagger-1">
+                        <form id="add-log-form" class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Date</label>
+                                    <input required type="date" name="date" class="modern-input w-full px-4 py-3 rounded-xl text-slate-800 font-medium" value="${today}">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Project</label>
+                                    <select required name="projectName" onchange="Render.autoFillTeam(this)" class="modern-input w-full px-4 py-3 rounded-xl text-slate-800 font-medium">
+                                        <option value="">Select Project</option>
+                                        ${projects.map(p => `<option value="${p.name}">${p.name}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Duration (Hours)</label>
+                                    <input required type="number" step="0.5" name="duration" class="modern-input w-full px-4 py-3 rounded-xl text-slate-800 font-medium" placeholder="0.0">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Today's Work / Description</label>
+                                <textarea required name="description" rows="3" class="modern-input w-full px-4 py-3 rounded-xl text-slate-800 font-medium" placeholder="Describe tasks completed today..."></textarea>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Team</label>
+                                    <input required type="text" name="teamName" id="form-team-name" class="modern-input w-full px-4 py-3 rounded-xl text-slate-800 font-medium" placeholder="Auto-filled from project">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Team Members</label>
+                                    <input required type="text" name="members" class="modern-input w-full px-4 py-3 rounded-xl text-slate-800 font-medium" placeholder="John, Jane (comma separated)">
+                                </div>
+                            </div>
+
+                            <div class="flex justify-end">
+                                <button type="submit" class="bg-sltBlue text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:shadow-blue-200 transition-all duration-300 flex items-center space-x-2 transform hover:-translate-y-0.5">
+                                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                    <span>Save Today's Work</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden animate-enter animate-stagger-2">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-slate-50/50 text-xs font-semibold text-slate-500 uppercase border-b border-slate-100">
+                                    <tr>
+                                        <th class="px-6 py-4">Date</th>
+                                        <th class="px-6 py-4">Project</th>
+                                        <th class="px-6 py-4 w-1/3">Description</th>
+                                        <th class="px-6 py-4">Team</th>
+                                        <th class="px-6 py-4">Duration</th>
+                                        ${isAdmin ? '<th class="px-6 py-4 text-center">Actions</th>' : ''}
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-50">
+                                    ${sortedLogs.map(log => `
+                                        <tr class="hover:bg-slate-50/30 transition-colors group">
+                                            <td class="px-6 py-4 text-slate-500 font-medium">${log.date}</td>
+                                            <td class="px-6 py-4 font-medium text-slate-800">${log.projectName}</td>
+                                            <td class="px-6 py-4 text-slate-600 text-sm">${log.description || '-'}</td>
+                                            <td class="px-6 py-4 text-slate-500">${log.teamName}</td>
+                                            <td class="px-6 py-4 font-bold text-sltBlue">${log.duration}h</td>
+                                            ${isAdmin ? `
+                                            <td class="px-6 py-4">
+                                                <div class="flex items-center justify-center space-x-2 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button onclick="Render.openLogModal(${log.id})" class="p-2 text-blue-500 bg-blue-50 rounded-lg hover:bg-blue-100 transition">${Icons.Edit}</button>
+                                                    <button onclick="Store.deleteLog(${log.id})" class="p-2 text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">${Icons.Trash}</button>
+                                                </div>
+                                            </td>` : ''}
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>`;
+            },
+
+            viewTeams() {
+                const isAdmin = Store.user.role === 'admin';
+                const { teams } = Store.data;
+                return `
+                <div class="space-y-8">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <h2 class="text-3xl font-bold text-slate-800 tracking-tight">Teams Management</h2>
+                            <p class="text-slate-500 mt-1">Organize your workforce efficiently.</p>
+                        </div>
+                        ${isAdmin ? `<button onclick="Render.openTeamModal()" class="bg-sltBlue text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-blue-200 transition-all duration-300 flex items-center space-x-2 transform hover:-translate-y-0.5">${Icons.Plus}<span>Add Team</span></button>` : ''}
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        ${teams.map(team => `
+                            <div class="bg-white p-6 rounded-2xl shadow-soft border border-slate-100 hover:shadow-md transition-shadow relative group">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center font-bold text-lg">${team.name.charAt(0)}</div>
+                                        <div>
+                                            <h3 class="font-bold text-slate-800">${team.name}</h3>
+                                            <p class="text-xs text-slate-400 font-medium uppercase tracking-wide">${team.leader}</p>
+                                        </div>
+                                    </div>
+                                    ${isAdmin ? `
+                                    <div class="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onclick="Render.openTeamModal(${team.id})" class="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition">${Icons.Edit}</button>
+                                        <button onclick="Store.deleteTeam(${team.id})" class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition">${Icons.Trash}</button>
+                                    </div>` : ''}
+                                </div>
+                                
+                                <div class="flex items-center justify-between mt-6 pt-6 border-t border-slate-50">
+                                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Members</p>
+                                    <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs font-semibold rounded-md border border-slate-100">${team.members.length} Active</span>
+                                </div>
+                                <div class="mt-3 flex flex-wrap gap-1.5">
+                                    ${team.members.map(m => `<span class="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs border border-slate-200 font-medium hover:bg-slate-200 transition">${m}</span>`).join('')}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+            },
+
+            // --- MODALS ---
+
+            openAccountModal() {
+                const isAdmin = Store.user.role === 'admin';
+                const html = `
+                <div class="flex flex-col md:flex-row gap-6 h-[450px]">
+                    <div class="flex flex-row md:flex-col gap-2 w-full md:w-48 border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-4">
+                        <button onclick="Render.switchAccountTab('profile')" class="account-tab w-full text-left px-4 py-3 rounded-lg font-medium text-sm transition-colors ${Store.accountModalTab === 'profile' ? 'bg-blue-50 text-sltBlue' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}">
+                            General
+                        </button>
+                        <button onclick="Render.switchAccountTab('security')" class="account-tab w-full text-left px-4 py-3 rounded-lg font-medium text-sm transition-colors ${Store.accountModalTab === 'security' ? 'bg-blue-50 text-sltBlue' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}">
+                            Security
+                        </button>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto">
+                        
+                        <!-- PROFILE TAB -->
+                        <div id="tab-profile" class="${Store.accountModalTab === 'profile' ? 'block' : 'hidden'} space-y-6 animate-enter">
+                            <div class="flex items-center space-x-4 mb-6 pb-6 border-b border-slate-100">
+                                <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-2xl font-bold text-sltBlue">
+                                    ${Store.user.name.charAt(0)}
+                                </div>
+                                <div>
+                                    <h4 class="text-lg font-bold text-slate-800">${Store.user.name}</h4>
+                                    <p class="text-sm text-slate-500">${Store.user.role === 'admin' ? 'System Administrator' : 'Standard User'}</p>
+                                </div>
+                            </div>
+
+                            <form onsubmit="Render.handleProfileUpdate(event)" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Display Name</label>
+                                    <input type="text" name="name" value="${Store.user.name}" class="modern-input w-full px-4 py-3 rounded-xl text-slate-800">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Email Address</label>
+                                    <input type="email" value="${Store.user.email || 'user@sltmobitel.com'}" disabled class="modern-input w-full px-4 py-3 rounded-xl text-slate-400 bg-slate-100 cursor-not-allowed">
+                                </div>
+                                <div class="flex justify-end">
+                                    <button type="submit" class="bg-sltBlue text-white px-6 py-2.5 rounded-lg font-medium shadow-lg shadow-blue-200 hover:bg-blue-700 transition">Save Changes</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- SECURITY TAB -->
+                        <div id="tab-security" class="${Store.accountModalTab === 'security' ? 'block' : 'hidden'} space-y-6 animate-enter">
+                            
+                            ${isAdmin ? `
+                                <!-- ADMIN: CHANGE USERNAME -->
+                                <div class="bg-blue-50/50 p-6 rounded-xl border border-blue-100 mb-6">
+                                    <h4 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                                        <svg class="w-5 h-5 mr-2 text-sltBlue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                        Change Username
+                                    </h4>
+                                    <form onsubmit="Render.handleUsernameUpdate(event)" class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">New Username</label>
+                                            <input required type="text" name="newUsername" value="${Store.user.username || ''}" class="modern-input w-full px-4 py-3 rounded-xl text-slate-800 font-medium">
+                                        </div>
+                                        <div class="flex justify-end">
+                                            <button type="submit" class="bg-sltBlue text-white px-6 py-2.5 rounded-lg font-medium shadow-lg shadow-blue-200 hover:bg-blue-700 transition">Update Username</button>
+                                        </div>
+                                    </form>
+                                </div>
+
+                                <!-- ADMIN: CHANGE PASSWORD -->
+                                <div>
+                                    <h4 class="text-lg font-bold text-slate-800 mb-2">Change Password</h4>
+                                    <p class="text-sm text-slate-500">Ensure your account is using a strong password.</p>
+                                </div>
+                                <form onsubmit="Render.handlePasswordUpdate(event)" class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Current Password</label>
+                                        <input type="password" required class="modern-input w-full px-4 py-3 rounded-xl text-slate-800">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">New Password</label>
+                                        <input type="password" required class="modern-input w-full px-4 py-3 rounded-xl text-slate-800">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Confirm New Password</label>
+                                        <input type="password" required class="modern-input w-full px-4 py-3 rounded-xl text-slate-800">
+                                    </div>
+                                    <div class="flex justify-end">
+                                        <button type="submit" class="bg-sltBlue text-white px-6 py-2.5 rounded-lg font-medium shadow-lg shadow-blue-200 hover:bg-blue-700 transition">Update Password</button>
+                                    </div>
+                                </form>
+                            ` : `
+                                <!-- USER: LOCKED MESSAGE -->
+                                <div class="flex flex-col items-center justify-center h-full text-center p-10 bg-slate-50 rounded-2xl border border-slate-200">
+                                    ${Icons.Lock}
+                                    <h4 class="text-xl font-bold text-slate-800 mb-2">Security Settings Locked</h4>
+                                    <p class="text-slate-500 max-w-sm">You do not have permission to change your username or password. Please contact your System Administrator.</p>
+                                </div>
+                            `}
+                        </div>
+
+                    </div>
+                </div>
+                `;
+                Modal.open("Account Settings", html);
+            },
+
+            switchAccountTab(tab) {
+                Store.accountModalTab = tab;
+                Render.openAccountModal();
+            },
+
+            handleProfileUpdate(e) {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                Store.updateProfile(fd.get('name'));
+                Modal.close();
+                Toast.show("Profile updated successfully", "success");
+            },
+
+            handleUsernameUpdate(e) {
+                e.preventDefault();
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                Store.user.username = fd.get('newUsername');
+                Render.app();
+                Modal.close();
+                Toast.show("Username updated successfully", "success");
+            },
+
+            handlePasswordUpdate(e) {
+                e.preventDefault();
+                Modal.close();
+                Toast.show("Password updated successfully", "success");
+            },
+
+            openProjectModal(id = null) {
+                const project = id ? Store.data.projects.find(p => p.id === id) : null;
+                const title = project ? "Edit Project" : "Add Project";
+                const teamOptions = Store.data.teams.map(t => `<option value="${t.name}" ${project && project.teamName === t.name ? 'selected' : ''}>${t.name}</option>`).join('');
+                const statusOptions = ['Active', 'Delayed', 'Completed'].map(s => `<option value="${s}" ${project && project.status === s ? 'selected' : ''}>${s}</option>`).join('');
+                const membersStr = project && project.members ? project.members.join(', ') : '';
+
+                const html = `
+                <form onsubmit="Render.handleProjectSubmit(event, ${id})" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Project Name</label>
+                        <input required type="text" name="name" class="modern-input w-full px-4 py-2.5 rounded-xl text-slate-800" value="${project ? project.name : ''}">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Start Day</label>
+                            <input required type="date" name="start" class="modern-input w-full px-4 py-2.5 rounded-xl text-slate-800" value="${project ? project.start : getLocalDateString()}">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">End Day</label>
+                            <input required type="date" name="end" class="modern-input w-full px-4 py-2.5 rounded-xl text-slate-800" value="${project ? project.end : ''}">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Assign Team</label>
+                        <select required name="teamName" class="modern-input w-full px-4 py-2.5 rounded-xl text-slate-800">
+                            <option value="">Select Team</option>
+                            ${teamOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Team Members (comma sep)</label>
+                        <input required type="text" name="members" class="modern-input w-full px-4 py-2.5 rounded-xl text-slate-800" placeholder="Alice, Bob, Charlie" value="${membersStr}">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Status</label>
+                        <select name="status" class="modern-input w-full px-4 py-2.5 rounded-xl text-slate-800">
+                            ${statusOptions}
+                        </select>
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button type="button" onclick="Modal.close()" class="px-5 py-2.5 text-slate-500 font-medium hover:bg-slate-100 rounded-xl transition">Cancel</button>
+                        <button type="submit" class="px-5 py-2.5 bg-sltBlue text-white font-medium rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-200 flex items-center">${Icons.Save}<span class="ml-1.5">Save</span></button>
+                    </div>
+                </form>`;
+                Modal.open(title, html);
+            },
+
+            handleProjectSubmit(e, id) {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                const data = {
+                    name: fd.get('name'),
+                    start: fd.get('start'),
+                    end: fd.get('end'),
+                    teamName: fd.get('teamName'),
+                    members: fd.get('members').split(',').map(s => s.trim()), 
+                    status: fd.get('status')
+                };
+                if (id) Store.updateProject(id, data);
+                else Store.addProject(data);
+                Modal.close();
+            },
+
+            openLogModal(id = null) {
+                const log = id ? Store.data.logs.find(l => l.id === id) : null;
+                const projectOptions = Store.data.projects.map(p => `<option value="${p.name}" ${log && log.projectName === p.name ? 'selected' : ''}>${p.name}</option>`).join('');
+                
+                const html = `
+                <form onsubmit="Render.handleLogSubmit(event, ${id})" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Date</label>
+                        <input required type="date" name="date" class="modern-input w-full px-4 py-2.5 rounded-xl text-slate-800" value="${log ? log.date : getLocalDateString()}">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Project Name</label>
+                        <select required name="projectName" onchange="Render.autoFillTeam(this)" class="modern-input w-full px-4 py-2.5 rounded-xl text-slate-800">
+                            <option value="">Select Project</option>
+                            ${projectOptions}
+                        </select>
+                    </div>
+                    <input type="hidden" name="teamName" id="modal-teamName" value="${log ? log.teamName : ''}">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Description</label>
+                        <textarea required name="description" rows="3" class="modern-input w-full px-4 py-2.5 rounded-xl text-slate-800" placeholder="Describe tasks...">${log ? log.description : ''}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Members (comma sep)</label>
+                        <input required type="text" name="members" class="modern-input w-full px-4 py-2.5 rounded-xl text-slate-800" placeholder="John, Jane" value="${log ? log.members : ''}">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Duration (Hours)</label>
+                        <input required type="number" name="duration" class="modern-input w-full px-4 py-2.5 rounded-xl text-slate-800" value="${log ? log.duration : ''}">
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button type="button" onclick="Modal.close()" class="px-5 py-2.5 text-slate-500 font-medium hover:bg-slate-100 rounded-xl transition">Cancel</button>
+                        <button type="submit" class="px-5 py-2.5 bg-sltBlue text-white font-medium rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-200 flex items-center">${Icons.Save}<span class="ml-1.5">Save Log</span></button>
+                    </div>
+                </form>`;
+                Modal.open(id ? "Edit Daily Log" : "Add Daily Log", html);
+            },
+
+            autoFillTeam(select) {
+                const proj = Store.data.projects.find(p => p.name === select.value);
+                const target = document.getElementById('modal-teamName') || document.getElementById('form-team-name');
+                if(target) target.value = proj ? proj.teamName : '';
+            },
+
+            handleLogSubmit(e, id) {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                const data = {
+                    date: fd.get('date'),
+                    projectName: fd.get('projectName'),
+                    teamName: fd.get('teamName'),
+                    description: fd.get('description'),
+                    members: fd.get('members'),
+                    duration: fd.get('duration')
+                };
+
+                if (id) {
+                    const idx = Store.data.logs.findIndex(l => l.id === id);
+                    Store.data.logs[idx] = { ...Store.data.logs[idx], ...data };
+                    Store.updateProjectProgress();
+                    Toast.show('Log updated', 'success');
+                } else {
+                    Store.addLog(data);
+                }
+                Modal.close();
+            },
+
+            openTeamModal(id = null) {
+                const team = id ? Store.data.teams.find(t => t.id === id) : null;
+                const title = team ? "Edit Team" : "Add Team";
+
+                const html = `
+                <form onsubmit="Render.handleTeamSubmit(event, ${id})" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Team Name</label>
+                        <input required type="text" name="name" class="modern-input w-full px-4 py-2.5 rounded-xl text-slate-800" value="${team ? team.name : ''}">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Team Leader</label>
+                        <input required type="text" name="leader" class="modern-input w-full px-4 py-2.5 rounded-xl text-slate-800" value="${team ? team.leader : ''}">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Members (comma separated)</label>
+                        <input required type="text" name="members" class="modern-input w-full px-4 py-2.5 rounded-xl text-slate-800" placeholder="Alice, Bob, Charlie" value="${team ? team.members.join(', ') : ''}">
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button type="button" onclick="Modal.close()" class="px-5 py-2.5 text-slate-500 font-medium hover:bg-slate-100 rounded-xl transition">Cancel</button>
+                        <button type="submit" class="px-5 py-2.5 bg-sltBlue text-white font-medium rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-200 flex items-center">${Icons.Save}<span class="ml-1.5">Save</span></button>
+                    </div>
+                </form>`;
+                Modal.open(title, html);
+            },
+
+            handleTeamSubmit(e, id) {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                const membersStr = fd.get('members');
+                if (id) {
+                    const membersArr = membersStr.split(',').map(s => s.trim());
+                    const data = {
+                        name: fd.get('name'),
+                        leader: fd.get('leader'),
+                        members: membersArr
+                    };
+                    const idx = Store.data.teams.findIndex(t => t.id === id);
+                    Store.data.teams[idx] = { ...Store.data.teams[idx], ...data };
+                    Render.app();
+                    Toast.show('Team updated', 'success');
+                } else {
+                    const data = {
+                        name: fd.get('name'),
+                        leader: fd.get('leader'),
+                        members: membersStr
+                    };
+                    Store.addTeam(data);
+                }
+                Modal.close();
+            },
+
+            viewTeamModal(teamName) {
+                const team = Store.data.teams.find(t => t.name === teamName);
+                if (!team) return;
+                const html = `
+                <div class="space-y-6">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 text-2xl font-bold shadow-sm">${team.name.charAt(0)}</div>
+                        <div>
+                            <h3 class="text-2xl font-bold text-slate-800">${team.name}</h3>
+                            <p class="text-slate-500">Led by ${team.leader}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Team Members</h4>
+                        <div class="flex flex-wrap gap-2">
+                            ${team.members.length > 0 ? team.members.map(m => `<span class="px-3 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-sm border border-slate-200">${m}</span>`).join('') : '<span class="text-slate-400 italic">No members assigned</span>'}
+                        </div>
+                    </div>
+                </div>`;
+                Modal.open("Team Details", html);
+            },
+
+            initChart() {
+                if (Store.currentView !== 'dashboard') return;
+                
+                setTimeout(() => {
+                    const ctx = document.getElementById('dashboardChart');
+                    if (!ctx) return;
+
+                    if (window.myChart) window.myChart.destroy();
+
+                    const { projects } = Store.data;
+                    const active = projects.filter(p => p.status === 'Active').length;
+                    const delayed = projects.filter(p => p.status === 'Delayed').length;
+                    const completed = projects.filter(p => p.status === 'Completed').length;
+
+                    window.myChart = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Active', 'Delayed', 'Completed'],
+                            datasets: [{
+                                data: [active, delayed, completed],
+                                backgroundColor: ['#005eb8', '#f97316', '#008000'],
+                                borderWidth: 0,
+                                hoverOffset: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            cutout: '70%',
+                            plugins: {
+                                legend: { display: false }
+                            }
+                        }
+                    });
+                }, 50);
+            },
+
+            attachLoginEvents() {
+                const tabs = document.querySelectorAll('.login-tab');
+                const submitBtn = document.getElementById('submit-btn');
+                const passwordFieldContainer = document.getElementById('password-field');
+                const usernameLabel = document.getElementById('username-label');
+                const usernameInput = document.getElementById('username');
+                const fieldsContainer = document.getElementById('login-fields-container');
+                const form = document.getElementById('login-form');
+
+                let mode = 'admin';
+
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        const selectedMode = tab.dataset.mode;
+                        mode = selectedMode;
+
+                        if (mode === 'user') {
+                            Store.user = { role: 'user', name: 'Standard User', email: 'user@sltmobitel.com' };
+                            Render.app();
+                        } else {
+                            fieldsContainer.classList.remove('opacity-0', 'pointer-events-none');
+                            passwordFieldContainer.classList.remove('hidden');
+                            usernameLabel.innerText = "Username";
+                            submitBtn.innerText = 'Login as Admin';
+                            submitBtn.classList.remove('bg-sltGreen', 'hover:shadow-green-200');
+                            submitBtn.classList.add('bg-sltBlue', 'hover:shadow-blue-200');
+                            usernameInput.placeholder = "Admin Username";
+                            
+                            tabs.forEach(t => {
+                                if (t.dataset.mode === 'admin') {
+                                    t.classList.remove('text-slate-500', 'hover:text-slate-700');
+                                    t.classList.add('bg-white', 'text-sltBlue', 'shadow-sm');
+                                } else {
+                                    t.classList.add('text-slate-500', 'hover:text-slate-700');
+                                    t.classList.remove('bg-white', 'text-sltBlue', 'text-sltGreen', 'shadow-sm');
+                                }
+                            });
+                        }
+                    });
+                });
+
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    if (mode === 'admin') {
+                        const user = document.getElementById('username').value;
+                        const pass = document.getElementById('password').value;
+                        
+                        if (!Store.login(user, pass)) {
+                            Toast.show('Invalid credentials', 'error');
+                        }
+                    }
+                });
+            },
+
+            attachGlobalEvents() {
+                document.getElementById('theme-btn').addEventListener('click', () => Store.toggleTheme());
+                document.getElementById('logout-btn').addEventListener('click', () => Store.logout());
+                document.getElementById('menu-btn').addEventListener('click', () => {
+                    Store.sidebarOpen = !Store.sidebarOpen;
+                    Render.app();
+                });
+                
+                const accountBtn = document.getElementById('my-account-btn');
+                if(accountBtn) {
+                    accountBtn.addEventListener('click', () => Render.openAccountModal());
+                }
+
+                const inlineLogForm = document.getElementById('add-log-form');
+                if (inlineLogForm) {
+                    inlineLogForm.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        const fd = new FormData(e.target);
+                        Store.addLog({
+                            date: fd.get('date'),
+                            projectName: fd.get('projectName'),
+                            teamName: fd.get('teamName'),
+                            description: fd.get('description'),
+                            members: fd.get('members'),
+                            duration: fd.get('duration')
+                        });
+                        const today = getLocalDateString();
+                        e.target.reset();
+                        e.target.querySelector('[name="date"]').value = today;
+                    });
+                }
+            }
+        };
+
+        // Initialize App
+        Render.app();
+    </script>
+</body>
+</html>
